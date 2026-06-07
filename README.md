@@ -6,7 +6,7 @@ O Salus permite que o usuário relate sintomas em linguagem natural, envie laudo
 
 ### Desenvolvido por:
 Autora: Yasmin Cassemiro Viegas<br>
-Orientador: Prof. Ilo Amy Saldanha Riverov<br>
+Orientador: Prof. Ilo Amy Saldanha Rivero<br>
 Ciência da Computação - PUC Minas 2026
 
 ---
