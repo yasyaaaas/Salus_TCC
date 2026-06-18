@@ -17,10 +17,17 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _emailController = TextEditingController();
   final _passController = TextEditingController();
   final _confirmPassController = TextEditingController();
+  final _ageController = TextEditingController();
+  final _weightController = TextEditingController();
+  final _heightController = TextEditingController();
+
   bool _obscurePass = true;
   bool _obscureConfirm = true;
   bool _lgpdAccepted = false;
   bool _isLoading = false;
+  String? _selectedGender;
+
+  final List<String> _genderOptions = ['Feminino', 'Masculino', 'Outro'];
 
   late final AnimationController _anim;
   late final Animation<double> _fade;
@@ -41,6 +48,9 @@ class _RegisterScreenState extends State<RegisterScreen>
     _emailController.dispose();
     _passController.dispose();
     _confirmPassController.dispose();
+    _ageController.dispose();
+    _weightController.dispose();
+    _heightController.dispose();
     super.dispose();
   }
 
@@ -51,13 +61,16 @@ class _RegisterScreenState extends State<RegisterScreen>
           content: const Text('Aceite os termos de uso para continuar'),
           backgroundColor: AppColors.urgencyMedium,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
       return;
     }
     if (_formKey.currentState?.validate() ?? false) {
       setState(() => _isLoading = true);
+      // TODO: integrar com backend FastAPI — enviar todos os dados incluindo
+      // age, weight, height e gender para o perfil do usuário
       Future.delayed(const Duration(seconds: 1), () {
         setState(() => _isLoading = false);
         Navigator.pushReplacementNamed(context, '/chat');
@@ -82,6 +95,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // ── Dados de conta ──────────────────────────────
+                      _buildSectionTitle('Dados da conta'),
+                      const SizedBox(height: 16),
                       _buildField(
                         label: AppStrings.fullName,
                         controller: _nameController,
@@ -127,7 +143,101 @@ class _RegisterScreenState extends State<RegisterScreen>
                             ? 'As senhas não coincidem'
                             : null,
                       ),
-                      const SizedBox(height: 22),
+
+                      // ── Dados de saúde ───────────────────────────────
+                      const SizedBox(height: 32),
+                      _buildSectionTitle('Dados de saúde'),
+                      const SizedBox(height: 4),
+                      _buildSectionSubtitle(
+                          'Usados para contextualizar as orientações do chatbot.'),
+                      const SizedBox(height: 16),
+
+                      // Linha: Idade + Gênero
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildField(
+                              label: 'Idade',
+                              controller: _ageController,
+                              hint: 'Ex: 22',
+                              icon: Icons.cake_outlined,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(3),
+                              ],
+                              validator: (v) {
+                                if (v == null || v.isEmpty) return 'Obrigatório';
+                                final age = int.tryParse(v);
+                                if (age == null || age < 1 || age > 120) {
+                                  return 'Inválida';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildGenderDropdown(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+
+                      // Linha: Peso + Altura
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildField(
+                              label: 'Peso (kg)',
+                              controller: _weightController,
+                              hint: 'Ex: 65',
+                              icon: Icons.monitor_weight_outlined,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                              validator: (v) {
+                                if (v == null || v.isEmpty) return 'Obrigatório';
+                                final w = double.tryParse(
+                                    v.replaceAll(',', '.'));
+                                if (w == null || w < 1 || w > 300) {
+                                  return 'Inválido';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildField(
+                              label: 'Altura (cm)',
+                              controller: _heightController,
+                              hint: 'Ex: 165',
+                              icon: Icons.height_rounded,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(3),
+                              ],
+                              validator: (v) {
+                                if (v == null || v.isEmpty) return 'Obrigatório';
+                                final h = int.tryParse(v);
+                                if (h == null || h < 50 || h > 250) {
+                                  return 'Inválida';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // IMC calculado dinamicamente
+                      const SizedBox(height: 12),
+                      _buildImcPreview(),
+
+                      // ── LGPD + Botão ─────────────────────────────────
+                      const SizedBox(height: 28),
                       _buildLgpdCheckbox(),
                       const SizedBox(height: 28),
                       _buildRegisterButton(),
@@ -143,6 +253,27 @@ class _RegisterScreenState extends State<RegisterScreen>
       ),
     );
   }
+
+  // ── Helpers de layout ────────────────────────────────────────────────────
+
+  Widget _buildSectionTitle(String text) => Text(
+        text,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+          letterSpacing: -0.2,
+        ),
+      );
+
+  Widget _buildSectionSubtitle(String text) => Text(
+        text,
+        style: const TextStyle(
+          fontSize: 13,
+          color: AppColors.textSecondary,
+          height: 1.4,
+        ),
+      );
 
   Widget _buildHeader(BuildContext context) {
     return Container(
@@ -222,6 +353,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     required String hint,
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
+    List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) {
     return Column(
@@ -231,6 +363,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
@@ -300,6 +433,92 @@ class _RegisterScreenState extends State<RegisterScreen>
         ),
       ],
     );
+  }
+
+  Widget _buildGenderDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel('Gênero'),
+        DropdownButtonFormField<String>(
+          value: _selectedGender,
+          decoration: InputDecoration(
+            prefixIcon: Container(
+              margin: const EdgeInsets.all(10),
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.blueSurface,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.wc_rounded,
+                  color: AppColors.blue, size: 18),
+            ),
+          ),
+          hint: const Text('Selecione',
+              style: TextStyle(fontSize: 14, color: AppColors.textHint)),
+          items: _genderOptions
+              .map((g) => DropdownMenuItem(
+                    value: g,
+                    child: Text(g,
+                        style: const TextStyle(
+                            fontSize: 14, color: AppColors.textPrimary)),
+                  ))
+              .toList(),
+          onChanged: (v) => setState(() => _selectedGender = v),
+          validator: (v) => v == null ? 'Selecione' : null,
+        ),
+      ],
+    );
+  }
+
+  /// Preview do IMC calculado em tempo real
+  Widget _buildImcPreview() {
+    final weight =
+        double.tryParse(_weightController.text.replaceAll(',', '.'));
+    final heightCm = int.tryParse(_heightController.text);
+
+    if (weight == null || heightCm == null || heightCm == 0) {
+      return const SizedBox.shrink();
+    }
+
+    final heightM = heightCm / 100;
+    final imc = weight / (heightM * heightM);
+    final (label, color) = _imcCategory(imc);
+
+    return AnimatedOpacity(
+      opacity: 1,
+      duration: const Duration(milliseconds: 300),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.calculate_outlined, color: color, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              'IMC: ${imc.toStringAsFixed(1)} — $label',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: color),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  (String, Color) _imcCategory(double imc) {
+    if (imc < 18.5) return ('Abaixo do peso', AppColors.manchesterBlue);
+    if (imc < 25.0) return ('Peso normal', AppColors.manchesterGreen);
+    if (imc < 30.0) return ('Sobrepeso', AppColors.manchesterYellow);
+    if (imc < 35.0) return ('Obesidade grau I', AppColors.manchesterOrange);
+    return ('Obesidade grau II+', AppColors.manchesterRed);
   }
 
   Widget _buildLgpdCheckbox() {

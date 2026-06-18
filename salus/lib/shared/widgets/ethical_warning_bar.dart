@@ -29,7 +29,7 @@ class EthicalWarningBar extends StatelessWidget {
             child: const Icon(
               Icons.info_outline_rounded,
               size: 16,
-              color: AppColors.warningText,
+              color: AppColors.warningPhrase,
             ),
           ),
           const SizedBox(width: 10),
@@ -38,7 +38,7 @@ class EthicalWarningBar extends StatelessWidget {
               AppStrings.ethicalWarning,
               style: TextStyle(
                 fontSize: 12,
-                color: AppColors.warningText,
+                color: AppColors.warningPhrase,
                 fontWeight: FontWeight.w500,
                 height: 1.4,
               ),

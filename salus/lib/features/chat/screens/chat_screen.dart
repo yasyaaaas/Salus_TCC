@@ -70,7 +70,7 @@ class _ChatScreenState extends State<ChatScreen>
       setState(() => _isTyping = false);
       _addBotMessage(
         'Entendi seus sintomas. Com base no que você relatou, recomendo buscar atendimento médico. Lembre-se: esta é apenas uma orientação informativa, não um diagnóstico.',
-        urgency: UrgencyLevel.medium,
+        urgency: UrgencyLevel.urgent,
       );
     });
   }

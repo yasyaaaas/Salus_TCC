@@ -3,7 +3,24 @@ import '../../../core/constants/app_colors.dart';
 
 enum MessageSender { user, bot }
 
-enum UrgencyLevel { high, medium, low }
+/// Escala de Manchester — 5 níveis de triagem
+/// Vermelho > Laranja > Amarelo > Verde > Azul
+enum UrgencyLevel {
+  /// Nível 1 — Imediato (vermelho)
+  immediate,
+
+  /// Nível 2 — Muito urgente (laranja)
+  veryUrgent,
+
+  /// Nível 3 — Urgente (amarelo)
+  urgent,
+
+  /// Nível 4 — Pouco urgente (verde)
+  lessUrgent,
+
+  /// Nível 5 — Não urgente (azul)
+  notUrgent,
+}
 
 class ChatMessage {
   final String text;
@@ -61,7 +78,7 @@ class MessageBubble extends StatelessWidget {
                 BoxShadow(
                   color: isUser
                       ? AppColors.blue.withValues(alpha: 0.18)
-                      : Colors.black.withValues(alpha: 0.5),
+                      : Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 3),
                 ),
@@ -79,7 +96,7 @@ class MessageBubble extends StatelessWidget {
           ),
           if (message.urgency != null) ...[
             const SizedBox(height: 6),
-            UrgencyBadge(level: message.urgency!),
+            ManchesterBadge(level: message.urgency!),
           ],
           const SizedBox(height: 2),
           Padding(
@@ -133,10 +150,11 @@ class MessageBubble extends StatelessWidget {
   }
 }
 
-class UrgencyBadge extends StatelessWidget {
+/// Badge visual seguindo a Escala de Manchester
+class ManchesterBadge extends StatelessWidget {
   final UrgencyLevel level;
 
-  const UrgencyBadge({super.key, required this.level});
+  const ManchesterBadge({super.key, required this.level});
 
   @override
   Widget build(BuildContext context) {
@@ -147,68 +165,105 @@ class UrgencyBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: cfg.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: cfg.border, width: 1),
+        border: Border.all(color: cfg.color.withValues(alpha: 0.4), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Quadrado colorido — padrão visual da Escala Manchester
           Container(
-            width: 7,
-            height: 7,
+            width: 12,
+            height: 12,
             decoration: BoxDecoration(
               color: cfg.color,
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(3),
             ),
           ),
-          const SizedBox(width: 7),
-          Text(
-            cfg.text,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: cfg.color,
-            ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                cfg.levelLabel,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: cfg.color,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              Text(
+                cfg.actionText,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: cfg.color.withValues(alpha: 0.85),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  _UrgencyConfig _config() {
+  _ManchesterConfig _config() {
     switch (level) {
-      case UrgencyLevel.high:
-        return const _UrgencyConfig(
-          text: 'Urgência alta · Atendimento imediato',
-          color: AppColors.urgencyHigh,
-          surface: AppColors.urgencyHighSurface,
-          border: AppColors.urgencyHighBorder,
+      case UrgencyLevel.immediate:
+        return _ManchesterConfig(
+          levelLabel: 'Nível 1 — Imediato',
+          actionText: 'Ligue 192 (SAMU) ou vá à UPA agora',
+          color: AppColors.manchesterRed,
+          surface: AppColors.manchesterRedSurface,
         );
-      case UrgencyLevel.medium:
-        return const _UrgencyConfig(
-          text: 'Urgência moderada · Procure atendimento hoje',
-          color: AppColors.urgencyMedium,
-          surface: AppColors.urgencyMediumSurface,
-          border: AppColors.urgencyMediumBorder,
+      case UrgencyLevel.veryUrgent:
+        return _ManchesterConfig(
+          levelLabel: 'Nível 2 — Muito urgente',
+          actionText: 'Busque atendimento em até 15 minutos',
+          color: AppColors.manchesterOrange,
+          surface: AppColors.manchesterOrangeSurface,
         );
-      case UrgencyLevel.low:
-        return const _UrgencyConfig(
-          text: 'Urgência baixa · Monitore os sintomas',
-          color: AppColors.urgencyLow,
-          surface: AppColors.urgencyLowSurface,
-          border: AppColors.urgencyLowBorder,
+      case UrgencyLevel.urgent:
+        return _ManchesterConfig(
+          levelLabel: 'Nível 3 — Urgente',
+          actionText: 'Procure atendimento hoje',
+          color: AppColors.manchesterYellow,
+          surface: AppColors.manchesterYellowSurface,
+        );
+      case UrgencyLevel.lessUrgent:
+        return _ManchesterConfig(
+          levelLabel: 'Nível 4 — Pouco urgente',
+          actionText: 'Consulte um médico em breve',
+          color: AppColors.manchesterGreen,
+          surface: AppColors.manchesterGreenSurface,
+        );
+      case UrgencyLevel.notUrgent:
+        return _ManchesterConfig(
+          levelLabel: 'Nível 5 — Não urgente',
+          actionText: 'Monitore os sintomas',
+          color: AppColors.manchesterBlue,
+          surface: AppColors.manchesterBlueSurface,
         );
     }
   }
 }
 
-class _UrgencyConfig {
-  final String text;
+class _ManchesterConfig {
+  final String levelLabel;
+  final String actionText;
   final Color color;
   final Color surface;
-  final Color border;
-  const _UrgencyConfig(
-      {required this.text,
-      required this.color,
-      required this.surface,
-      required this.border});
+
+  const _ManchesterConfig({
+    required this.levelLabel,
+    required this.actionText,
+    required this.color,
+    required this.surface,
+  });
+}
+
+/// Mantido para retrocompatibilidade — use ManchesterBadge para novos usos
+@Deprecated('Use ManchesterBadge com UrgencyLevel da Escala Manchester')
+class UrgencyBadge extends ManchesterBadge {
+  const UrgencyBadge({super.key, required super.level});
 }
