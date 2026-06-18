@@ -1,16 +1,19 @@
-# salus
+# Salus
 
-A new Flutter project.
+Desenvolvido por:
+Autora: Yasmin Cassemiro Viegas<br>
+Orientador: Prof. Ilo Amy Saldanha Rivero<br>
+Ciência da Computação - PUC Minas 2026
 
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### Estrutura do projeto
+```bash
+lib/
+├── core/          # Tema, cores, constantes
+├── features/      # Telas por funcionalidade
+│   ├── auth/
+│   ├── chat/
+│   ├── exams/
+│   ├── location/
+│   └── profile/
+└── shared/        # Widgets reutilizáveis
+```
