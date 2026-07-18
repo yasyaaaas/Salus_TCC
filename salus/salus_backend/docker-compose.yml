@@ -1,0 +1,17 @@
+# docker-compose.yml -> cria um serviço de banco de dados PostgreSQL usando Docker Compose
+
+services:
+  db:
+    image: postgres:16-alpine  # usa essa receita pronta
+    container_name: salus_postgres # nome do conteiner
+    environment:
+      POSTGRES_USER: salus # cria um usuário chamado "salus"
+      POSTGRES_PASSWORD: cruzeiro_459 # com essa senha
+      POSTGRES_DB: salus_db # já cria um banco vazio chamado "salus_db"
+    ports:
+      - "5432:5432" # PORTA_DO_LOCALHOST:PORTA_DO_POSTGRESQL
+    volumes:
+      - salus_pg_data:/var/lib/postgresql/data # desligar o conteiner, ligar de novo, e os dados continuam lá
+
+volumes:
+  salus_pg_data:
