@@ -1,9 +1,14 @@
 # database.py -> cria a conexão com o banco de dados e cria a sessão para falar com o banco
 
+import os
+
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
-DATABASE_URL = "postgresql://salus:cruzeiro_459@localhost:5432/salus_db" # vem do docker
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL") # vem do docker
 
 engine = create_engine(DATABASE_URL) # sabe como falar com esse banco
 SessionLocal = sessionmaker(bind=engine) # cria uma sessão para falar com o banco

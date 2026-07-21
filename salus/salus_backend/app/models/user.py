@@ -1,11 +1,11 @@
-# app/models.py -> tabela de usuários no banco de dados
+# app/user.py -> tabela de usuários no banco de dados
 
 import uuid
 from sqlalchemy import String, Integer, Float
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base # Herda da Base para criar a tabela no banco
+from app.db.database import Base # Herda da Base para criar a tabela no banco
 
 
 class User(Base):

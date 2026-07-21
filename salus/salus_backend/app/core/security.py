@@ -1,8 +1,13 @@
 # security.py -> hash e verifica senha, cria e decodifica token de acesso
 
+import os
+from dotenv import load_dotenv
+
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
+
+load_dotenv() # carrega as variáveis de ambiente do arquivo .env
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -14,7 +19,7 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
-SECRET_KEY = "sanasasukeamoreterno123"  # chave secreta usada para criar e ler o token
+SECRET_KEY = os.getenv("SECRET_KEY") # chave secreta usada para criar e ler o token
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24 horas
 

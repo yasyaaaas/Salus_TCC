@@ -4,7 +4,10 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../shared/widgets/ethical_warning_bar.dart';
 import '../widgets/message_bubble.dart';
+import '../../../core/services/api_service.dart';
+import '../../../shared/widgets/app_bottom_nav.dart';
 
+// tela principal de conversa com o chatbot
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
 
@@ -18,19 +21,74 @@ class _ChatScreenState extends State<ChatScreen>
   final _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
   bool _isTyping = false;
-  int _selectedNavIndex = 0;
 
   late final AnimationController _dotAnim;
 
-  @override
-  void initState() {
-    super.initState();
-    _dotAnim = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1200))
-      ..repeat();
-    _addBotMessage(AppStrings.chatWelcome);
+  // converte a cor recebida em um nível de urgência
+  UrgencyLevel? _urgencyFromColor(String? color) {
+    switch (color) {
+      case 'vermelho':
+        return UrgencyLevel.immediate;
+      case 'laranja':
+        return UrgencyLevel.veryUrgent;
+      case 'amarelo':
+        return UrgencyLevel.urgent;
+      case 'verde':
+        return UrgencyLevel.lessUrgent;
+      case 'azul':
+        return UrgencyLevel.notUrgent;
+      default:
+        return null;
+    }
   }
 
+  // inicializa o controlador de animação e carrega o histórico anterior
+  @override
+  void initState() {
+  super.initState();
+  _dotAnim = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 1200))
+    ..repeat();
+  _carregarHistorico();
+}
+
+  // busca o histórico de mensagens já salvo para exibir na tela
+  Future<void> _carregarHistorico() async {
+    final resultado = await ApiService().getChatHistory();
+
+    if (!mounted) return;
+
+    if (resultado.isSuccess && resultado.data!.isNotEmpty) {
+      final historico =
+          resultado.data!.reversed; // API devolve mais recente primeiro
+
+      for (final item in historico) { // a linah da tabela chat_messages guarda a mensagem e a resposta na mesma linha
+        _messages.add( // assim separei em 2 bolhas
+          // mensagem do usuario
+          ChatMessage(
+            text: item['mensagem_usuario'],
+            sender: MessageSender.user,
+            timestamp: DateTime.parse(item['created_at']),
+          ),
+        );
+        _messages.add(
+          // mensagem do chat
+          ChatMessage(
+            text: item['resposta_chatbot'],
+            sender: MessageSender.bot,
+            timestamp: DateTime.parse(item['created_at']),
+            urgency: _urgencyFromColor(item['manchester_color']),
+          ),
+        );
+      }
+      setState(() {});
+      _scrollToBottom();
+    } else {
+      _addBotMessage(AppStrings.chatWelcome); // se não tiver histórico cai na mesma inicial de sempre
+    }
+  }
+
+  // libera os recursos usados pelo estado da tela
   @override
   void dispose() {
     _dotAnim.dispose();
@@ -39,6 +97,7 @@ class _ChatScreenState extends State<ChatScreen>
     super.dispose();
   }
 
+  // adiciona uma resposta do chatbot na lista de mensagens
   void _addBotMessage(String text, {UrgencyLevel? urgency}) {
     setState(() {
       _messages.add(ChatMessage(
@@ -51,30 +110,47 @@ class _ChatScreenState extends State<ChatScreen>
     _scrollToBottom();
   }
 
-  void _sendMessage() {
+  // envia a mensagem do usuário e espera a resposta do chatbot
+  Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
+
     setState(() {
-      _messages.add(ChatMessage(
-        text: text,
-        sender: MessageSender.user,
-        timestamp: DateTime.now(),
-      ));
-      _isTyping = true;
+      _messages.add(
+        ChatMessage( // quem está mandando a mensagem é o usuario
+          text: text,
+          sender: MessageSender.user,
+          timestamp: DateTime.now(),
+        ),
+      );
+      _isTyping = true; // ... da ia "pensando"
     });
     _messageController.clear();
     _scrollToBottom();
 
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      setState(() => _isTyping = false);
+    final resultado = await ApiService().sendChatMessage(text); // espera a resposta do chat
+
+    if (!mounted) return;
+    setState(() => _isTyping = false); // parou de pensar
+
+    if (resultado.isSuccess) { // sucesso -> devolve a resposta do chat
+      final dados = resultado.data!;
       _addBotMessage(
-        'Entendi seus sintomas. Com base no que você relatou, recomendo buscar atendimento médico. Lembre-se: esta é apenas uma orientação informativa, não um diagnóstico.',
-        urgency: UrgencyLevel.urgent,
+        dados['resposta'],
+        urgency: _urgencyFromColor(dados['manchester_color']), // usa a mancgerter color depois avisando
       );
-    });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar( // se der erro msg de erro
+        SnackBar(
+          content: Text(resultado.error ?? 'Erro ao enviar mensagem'),
+          backgroundColor: AppColors.urgencyHigh,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
+  // leva a lista de mensagens para o fim após cada atualização
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -87,6 +163,7 @@ class _ChatScreenState extends State<ChatScreen>
     });
   }
 
+  // monta a estrutura visual da tela de chat
   @override
   Widget build(BuildContext context) {
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
@@ -100,98 +177,124 @@ class _ChatScreenState extends State<ChatScreen>
           _buildInputBar(),
         ],
       ),
-      bottomNavigationBar: _buildBottomNav(context),
+      bottomNavigationBar: const AppBottomNav(currentIndex: 0), // navegação inferior entre chat, exames, unidades e perfil
     );
   }
 
+  // constrói o cabeçalho com o nome e o status do chatbot
   Widget _buildHeader() {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF1E3A8A), Color(0xFF2563EB), Color(0xFF3B82F6)],
-        ),
+      decoration: BoxDecoration(
+        gradient: AppColors.blueGradient,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.blue.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Row(
-            children: [
-              // Avatar do bot
-              Container(
-                width: 42,
-                height: 42,
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -40,
+              right: -30,
+              child: Container(
+                width: 140,
+                height: 140,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
                   shape: BoxShape.circle,
-                  border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.3), width: 1),
+                  color: Colors.white.withValues(alpha: 0.06),
                 ),
-                child: const Icon(Icons.favorite_rounded,
-                    color: AppColors.white, size: 20),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            Positioned(
+              bottom: -20,
+              left: -20,
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.05),
+                ),
+              ),
+            ),
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                child: Row(
                   children: [
-                    const Text(
-                      AppStrings.chatBotName,
-                      style: TextStyle(
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.favorite_rounded,
                         color: AppColors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.2,
+                        size: 20,
                       ),
                     ),
-                    Row(
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF4ADE80),
-                            shape: BoxShape.circle,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            AppStrings.chatBotName,
+                            style: TextStyle(
+                              color: AppColors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.2,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          AppStrings.chatOnline,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.8),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
+                          Row(
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF4ADE80),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                AppStrings.chatOnline,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-              // Botão de histórico
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.history_rounded,
-                      color: AppColors.white, size: 18),
-                  onPressed: () {},
-                  padding: EdgeInsets.zero,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
+  // exibe a lista de mensagens em formato de conversa
   Widget _buildMessageList() {
     return ListView.builder(
       controller: _scrollController,
@@ -206,6 +309,7 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
+  // mostra a animação de digitação enquanto o chatbot responde
   Widget _buildTypingIndicator() {
     return Padding(
       padding: const EdgeInsets.only(left: 16, bottom: 8),
@@ -252,6 +356,7 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
+  // cria cada ponto da animação de digitação
   Widget _buildAnimatedDot(int index) {
     return Padding(
       padding: EdgeInsets.only(right: index < 2 ? 4 : 0),
@@ -276,6 +381,7 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
+  // monta a barra de digitação com campo de texto e botão de envio
   Widget _buildInputBar() {
     return Container(
       padding: EdgeInsets.only(
@@ -368,55 +474,6 @@ class _ChatScreenState extends State<ChatScreen>
               child: const Icon(Icons.send_rounded,
                   color: AppColors.white, size: 18),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNav(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        border: Border(top: BorderSide(color: AppColors.border, width: 0.8)),
-      ),
-      child: NavigationBar(
-        selectedIndex: _selectedNavIndex,
-        onDestinationSelected: (index) {
-          setState(() => _selectedNavIndex = index);
-          switch (index) {
-            case 1:
-              Navigator.pushNamed(context, '/exams');
-            case 2:
-              Navigator.pushNamed(context, '/location');
-            case 3:
-              Navigator.pushNamed(context, '/profile');
-          }
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline_rounded),
-            selectedIcon:
-                Icon(Icons.chat_bubble_rounded, color: AppColors.blue),
-            label: 'Chat',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.biotech_outlined),
-            selectedIcon:
-                Icon(Icons.biotech_rounded, color: AppColors.mint),
-            label: 'Exames',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.location_on_outlined),
-            selectedIcon:
-                Icon(Icons.location_on_rounded, color: AppColors.mint),
-            label: 'Unidades',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon:
-                Icon(Icons.person_rounded, color: AppColors.blue),
-            label: 'Perfil',
           ),
         ],
       ),

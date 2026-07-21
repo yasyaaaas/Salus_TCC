@@ -4,9 +4,9 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
-from app.database import get_db
-from app.models import User
-from app.security import decode_access_token
+from app.db.database import get_db
+from app.models.user import User
+from app.core.security import decode_access_token
 
 security = HTTPBearer() # cria um esquema de segurança do tipo Bearer, que é o tipo de token que vamos usar para autenticação
 

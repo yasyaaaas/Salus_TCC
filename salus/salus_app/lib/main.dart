@@ -7,7 +7,6 @@ import 'features/chat/screens/chat_screen.dart';
 import 'features/exams/screens/exam_screen.dart';
 import 'features/location/screens/location_screen.dart';
 import 'features/profile/screens/profile_screen.dart';
-import 'core/services/api_service.dart';
 
 void main() {
   runApp(const SalusApp());

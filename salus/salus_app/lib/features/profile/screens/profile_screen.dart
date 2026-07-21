@@ -7,6 +7,8 @@ import '../../../core/constants/legal_texts.dart';
 import '../widgets/edit_profile.dart';
 import '../widgets/avatar_picker.dart';
 import '../../../core/constants/avatars.dart';
+import '../widgets/chat_history_detail.dart';
+import '../../../shared/widgets/app_bottom_nav.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -19,6 +21,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _profile;
   bool _isLoading = true;
   String? _errorMessage;
+  List<dynamic> _historico = [];
 
   @override
   void initState() {
@@ -29,18 +32,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadProfile() async {
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
 
-    final resultado = await ApiService().getProfile();
+    final resultados = await Future.wait([
+      ApiService().getProfile(),
+      ApiService().getChatHistory(),
+    ]);
 
     if (!mounted) return;
+
+    final resultadoPerfil = resultados[0];
+    final resultadoHistorico = resultados[1];
+
     setState(() {
       _isLoading = false;
-      if (resultado.isSuccess) {
-        _profile = resultado.data;
-      } else {
-        _errorMessage = resultado.error;
+      if (resultadoPerfil.isSuccess) {
+        _profile = resultadoPerfil.data as Map<String, dynamic>?;
+      }
+      if (resultadoHistorico.isSuccess) {
+        _historico = (resultadoHistorico.data as List<dynamic>?) ?? [];
       }
     });
   }
@@ -108,7 +118,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return Scaffold(
         body: const Center(
             child: CircularProgressIndicator(color: AppColors.blue)),
-        bottomNavigationBar: _buildBottomNav(context),
+        bottomNavigationBar: AppBottomNav(currentIndex: 3), //  barra de navegação inferior, igual à usada no chat, exames e unidades
       );
     }
 
@@ -136,7 +146,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ),
-        bottomNavigationBar: _buildBottomNav(context),
+        bottomNavigationBar: AppBottomNav(currentIndex: 3), // barra de navegação inferior, igual à usada no chat, exames e unidades
       );
     }
 
@@ -166,59 +176,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: _buildBottomNav(context),
-    );
-  }
-
-  // barra de navegação inferior, igual à usada no chat, exames e unidades
-  Widget _buildBottomNav(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        border: Border(top: BorderSide(color: AppColors.border, width: 0.8)),
-      ),
-      child: NavigationBar(
-        selectedIndex: 3,
-        onDestinationSelected: (index) {
-          switch (index) {
-            case 0:
-              Navigator.pushNamedAndRemoveUntil(
-                  context, '/chat', (route) => false);
-            case 1:
-              Navigator.pushNamed(context, '/exams');
-            case 2:
-              Navigator.pushNamed(context, '/location');
-            case 3:
-              break; // já estamos no perfil
-          }
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline_rounded),
-            selectedIcon:
-                Icon(Icons.chat_bubble_rounded, color: AppColors.blue),
-            label: 'Chat',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.biotech_outlined),
-            selectedIcon:
-                Icon(Icons.biotech_rounded, color: AppColors.mint),
-            label: 'Exames',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.location_on_outlined),
-            selectedIcon:
-                Icon(Icons.location_on_rounded, color: AppColors.mint),
-            label: 'Unidades',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon:
-                Icon(Icons.person_rounded, color: AppColors.blue),
-            label: 'Perfil',
-          ),
-        ],
-      ),
+      bottomNavigationBar: AppBottomNav(currentIndex: 3),
     );
   }
 
@@ -648,28 +606,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // Histórico 
 
-  // lista o histórico recente de interações e exames do usuário
+  // monta a seção de histórico de conversas do usuário
   Widget _buildHistorySection() {
-    final history = [
-      _HistoryItem(
-        title: 'Dor de cabeça e febre',
-        date: 'Hoje · 09:38',
+    // mostra uma mensagem simples quando ainda não existe nenhum registro
+    if (_historico.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            AppStrings.profileHistory,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(20),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border, width: 0.5),
+            ),
+            child: const Text(
+              'Você ainda não conversou com o Salus',
+              style: TextStyle(fontSize: 13, color: AppColors.textHint),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // transforma cada item do histórico que veio da API em um card visual com título e data
+    final items = _historico.map((registro) {
+      return _HistoryItem(
+        title: registro['mensagem_usuario'],
+        date: _formatarDataHistorico(DateTime.parse(registro['created_at'])),
         color: AppColors.blue,
         icon: Icons.chat_bubble_outline_rounded,
-      ),
-      _HistoryItem(
-        title: 'Exame de glicose analisado',
-        date: 'Ontem · 15:12',
-        color: AppColors.mint,
-        icon: Icons.science_outlined,
-      ),
-      _HistoryItem(
-        title: 'Dor nas costas há 3 dias',
-        date: '03 jun · 11:45',
-        color: AppColors.blue,
-        icon: Icons.chat_bubble_outline_rounded,
-      ),
-    ];
+        resposta: registro['resposta_chatbot'],
+        manchesterColor: registro['manchester_color'],
+        manchesterLabel: registro['manchester_label'],
+      );
+    }).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -683,9 +664,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        ...history.map((item) => _buildHistoryCard(item)),
+        ...items.map((item) => _buildHistoryCard(item)),
       ],
     );
+  }
+
+  // formata a data do registro para mostrar hoje, ontem ou uma data resumida
+  String _formatarDataHistorico(DateTime data) {
+    final agora = DateTime.now();
+    final hoje = DateTime(agora.year, agora.month, agora.day);
+    final diaDoRegistro = DateTime(data.year, data.month, data.day);
+    final hora =
+        '${data.hour.toString().padLeft(2, '0')}:${data.minute.toString().padLeft(2, '0')}';
+
+    // mostra a hora diretamente quando o registro é de hoje
+    if (diaDoRegistro == hoje) {
+      return 'Hoje · $hora';
+    }
+    // usa a palavra ontem para o dia anterior
+    if (diaDoRegistro == hoje.subtract(const Duration(days: 1))) {
+      return 'Ontem · $hora';
+    }
+    final dia = data.day.toString().padLeft(2, '0');
+    final meses = [
+      'jan',
+      'fev',
+      'mar',
+      'abr',
+      'mai',
+      'jun',
+      'jul',
+      'ago',
+      'set',
+      'out',
+      'nov',
+      'dez',
+    ];
+    return '$dia ${meses[data.month - 1]} · $hora';
   }
 
   // card individual para cada item do histórico exibido na tela
@@ -708,7 +723,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () {},
+          onTap: item.resposta == null
+              ? null // se por algum motivo não tiver resposta associada, o card fica sem reagir ao toque
+              : () {
+                  showModalBottomSheet( // abre a tela de detalhe da conversa ao tocar no card
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => ChatHistoryDetailSheet(
+                      pergunta: item.title,
+                      resposta: item.resposta!,
+                      data: item.date,
+                      manchesterColor: item.manchesterColor,
+                      manchesterLabel: item.manchesterLabel,
+                    ),
+                  );
+                },
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Row(
@@ -920,11 +950,18 @@ class _HistoryItem {
   final String date;
   final Color color;
   final IconData icon;
-  const _HistoryItem(
-      {required this.title,
-      required this.date,
-      required this.color,
-      required this.icon});
+  final String? resposta;
+  final String? manchesterColor;
+  final String? manchesterLabel;
+  const _HistoryItem({
+    required this.title,
+    required this.date,
+    required this.color,
+    required this.icon,
+    this.resposta,
+    this.manchesterColor,
+    this.manchesterLabel,
+  });
 }
 
 class _SettingsItem {

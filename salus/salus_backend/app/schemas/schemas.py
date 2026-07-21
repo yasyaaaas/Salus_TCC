@@ -1,6 +1,7 @@
 # schemas.py -> moldes de validação de dados -> o que entra e o que sai da API
 
 import uuid
+from datetime import datetime, UTC
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 class UserCreate(BaseModel): # descreve o que entra na requisição (o cliente manda nome, e-mail, senha)
@@ -57,3 +58,35 @@ class UserUpdate(BaseModel): # descreve o que entra na requisição de atualiza�
         if valor is not None and valor not in AVATARES_VALIDOS:
             raise ValueError(f"Avatar inválido. Opções: {', '.join(AVATARES_VALIDOS)}")
         return valor
+    
+
+class ChatRequest(BaseModel): # request do usuario é a mensagem dele
+    mensagem: str
+
+
+class CondicaoRelacionada(BaseModel): # o qeu vai voltar para o usuario
+    name: str
+    cid10: str | None
+    manchester_color: str
+    manchester_label: str
+    informative_message: str
+    pontuacao: float
+
+
+class ChatResponse(BaseModel): # reposta com respots string, as partes mancherster e a lista de CondicaoRelacionada
+    resposta: str
+    manchester_color: str | None
+    manchester_label: str | None
+    condicoes_relacionadas: list[CondicaoRelacionada]
+
+
+class ChatHistoryItem(BaseModel): # o qeu vai sair para o usuário no histórico
+    id: int
+    mensagem_usuario: str
+    resposta_chatbot: str
+    manchester_color: str | None
+    manchester_label: str | None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True # os dados vem do ChatMessage então precisa de permissão

@@ -208,6 +208,69 @@ class ApiService {
   Future<ApiResult<Map<String, dynamic>>> updateAvatar(String avatarFileName) {
     return updateProfile(avatar: avatarFileName);
   }
+
+  // USUARIO MANDA MENSAGEM
+  Future<ApiResult<Map<String, dynamic>>> sendChatMessage(
+    String mensagem,
+  ) async {
+    final token = await _getToken();
+    if (token == null) { // se não tiver token da erro
+      return ApiResult.failure('Sessão expirada. Faça login novamente.');
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse(
+          '$baseUrl/chat',
+        ), //  faz uma requisição POST para a URL de chat do servidor FastAPI
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'mensagem': mensagem,
+        }), // mensagem do usuario é a mensagem enviada par o chat_services.py
+      );
+
+      if (response.statusCode == 200) {
+        // se da sucesso pega o retorno da resposat do chat e manda na tela
+        return ApiResult.success(jsonDecode(response.body));
+      }
+
+      final erro = jsonDecode(response.body);
+      return ApiResult.failure(
+        erro['detail']?.toString() ?? 'Erro ao enviar mensagem',
+      ); // erro
+    } catch (_) {
+      return ApiResult.failure('Não foi possível conectar ao servidor.');
+    }
+  }
+
+  // BUSCAR HISTÓRICO
+  Future<ApiResult<List<dynamic>>> getChatHistory() async { // é uma lista de mensagens por isso o list<dynamic>
+    final token = await _getToken();
+    if (token == null) { // se não tiver token da erro
+      return ApiResult.failure('Sessão expirada. Faça login novamente.');
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/chat/history'), // faz uma requisição GET para a URL de histórico do servidor FastAPI
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) { // se der sucesso pega as respostas antigas em ordem decrescente
+        return ApiResult.success(jsonDecode(response.body));
+      }
+
+      final erro = jsonDecode(response.body);
+      return ApiResult.failure( // erro
+        erro['detail']?.toString() ?? 'Erro ao buscar histórico',
+      );
+    } catch (_) {
+      return ApiResult.failure('Não foi possível conectar ao servidor.');
+    }
+  }
 }
 
 // Resultado de chamadas a API | <t> -> guarda qualquer tipo de dados
