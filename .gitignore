@@ -117,3 +117,34 @@ app.*.symbols
 !**/ios/**/default.perspectivev3
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
 !/dev/ci/**/Gemfile.lock
+
+
+# BACKEND
+
+# Ambiente virtual
+salus_backend/venv/
+salus_backend/__pycache__/
+salus_backend/**/__pycache__/
+salus_backend/*.pyc
+
+# Arquivos de ambiente (.env)
+salus_backend/.env
+salus_backend/.env.local
+salus_backend/.env.*.local
+
+# Banco de dados local
+# salus_backend/*.db
+# salus_backend/*.sqlite
+
+# Logs
+salus_backend/*.log
+salus_backend/**/*.log
+
+# IDE / Editor
+salus_backend/.vscode/
+salus_backend/.idea/
+salus_backend/*.iml
+
+# Arquivos de dados
+salus_backend/data/exames_teste/
+salus_backend/data/*.pdf

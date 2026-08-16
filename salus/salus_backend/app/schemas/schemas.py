@@ -90,3 +90,43 @@ class ChatHistoryItem(BaseModel): # o qeu vai sair para o usuário no histórico
 
     class Config:
         from_attributes = True # os dados vem do ChatMessage então precisa de permissão
+
+
+class ExamResultItem(BaseModel): # descreve um item individual de resultado de exame
+    parametro: str
+    valor: float
+    unidade: str
+    valor_min: float | None = None
+    valor_max: float | None = None
+    status: str
+    mensagem: str | None = None
+
+class ExamAnalysisResponse(BaseModel): # descreve a resposta com a lista de resultados do exame
+    resultados: list[ExamResultItem]
+
+class ExamHistoryItem(BaseModel): # descreve um item do histórico de exames retornado para o usuário
+    id: int
+    nome_arquivo: str | None
+    resultados: list[ExamResultItem]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True # os dados vem do modelo de exame então precisa de permissão
+
+
+class NearbyUnit(BaseModel): # descreve uma unidade de saúde próxima retornada para o usuário
+    nome: str
+    tipo: str
+    latitude: float
+    longitude: float
+    endereco: str | None = None
+    distancia_km: float
+
+class RouteCoordinate(BaseModel): # descreve uma coordenada de rota retornada para o usuário
+    latitude: float
+    longitude: float
+
+class RouteResponse(BaseModel): # descreve a resposta de rota retornada para o usuário
+    distancia_km: float
+    duracao_min: int
+    coordenadas: list[RouteCoordinate]

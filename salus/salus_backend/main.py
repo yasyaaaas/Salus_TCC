@@ -1,16 +1,19 @@
 # main.py -> cria a aplicação FastAPI, define as rotas e as funções que serão executadas quando essas rotas forem acessadas
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.db.database import Base, engine, get_db
 from app.models.user import User
-from app.schemas.schemas import UserCreate, UserOut, LoginRequest, TokenResponse, UserUpdate, ChatRequest, ChatResponse, ChatHistoryItem
+from app.schemas.schemas import UserCreate, UserOut, LoginRequest, TokenResponse, UserUpdate, ChatRequest, ChatResponse, ChatHistoryItem, ExamAnalysisResponse, ExamHistoryItem, NearbyUnit, RouteResponse
 from app.core.security import hash_password, verify_password, create_access_token, decode_access_token
 from app.auth_deps import get_current_user
 from app.services.chat_services import processar_mensagem_chat
 from app.models.knowledge import Symptom, Condition, SymptomCondition  # noqa: F401
 from app.models.chat import ChatMessage  # noqa: F401
+from app.models.exam import ExamAnalysis  # noqa: F401
+from app.services.exam_service import analisar_laudo
+from app.services.location_service import buscar_unidades_proximas, calcular_rota
 
 app = FastAPI() # cria a plicação -> o qeu o Uvicorn procura
 
@@ -115,3 +118,62 @@ def get_chat_history(
         .all() # devolve todos os resultados
     )
     return mensagens # devolve eles
+
+
+# POST /exams/upload
+@app.post("/exams/upload", response_model=ExamAnalysisResponse) # quando o usuário enviar um exame, ele vai executar a função upload_exame
+# response_model=ExamAnalysisResponse -> resposta vem do schemas
+async def upload_exame(
+    file: UploadFile = File(...),
+    usuario_atual: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+): # recebe o arquivo do exame, lê o conteúdo, analisa e salva no banco
+    conteudo = await file.read() # lê o conteúdo do arquivo enviado pelo usuário
+    resultados = analisar_laudo(conteudo, usuario_atual.gender) # envia o conteúdo do exame e o genero do usuário para a função de análise e recebe os resultados
+
+    nova_analise = ExamAnalysis( # cria um novo objeto de análise de exame para salvar no banco
+        user_id=usuario_atual.id,
+        nome_arquivo=file.filename,
+        resultados=resultados,
+    )
+    db.add(nova_analise) # adiciona a análise na sessão do banco
+    db.commit() # salva as alterações no banco
+
+    return {"resultados": resultados} # devolve os resultados da análise para o usuário
+
+# GET /exams/history
+@app.get("/exams/history", response_model=list[ExamHistoryItem]) # quando o usuário acessar o histórico de exames, ele vai executar a função get_exam_history
+def get_exam_history(
+    usuario_atual: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+): # busca no banco as análises de exame do usuário atual, ordenadas das mais recentes para as mais antigas
+    return (
+        db.query(ExamAnalysis) # busca as análises de exame na tabela
+        .filter(ExamAnalysis.user_id == usuario_atual.id) # filtra pelas análises pertencentes ao usuário atual
+        .order_by(ExamAnalysis.created_at.desc()) # ordena pelo mais recente primeiro
+        .all() # devolve todos os resultados
+    )
+
+
+# GET /location/nearby
+@app.get("/location/nearby", response_model=list[NearbyUnit]) # quando o usuário acessar a rota de localizações por perto com o método GET, ele vai executar a função get_nearby_units
+def get_nearby_units( # recebe a latitude e longitude do usuário e devolve as unidades de saúde próximas
+    lat: float,
+    lon: float,
+    _: User = Depends(get_current_user),
+):
+    return buscar_unidades_proximas(lat, lon) # chama a função buscar_unidades_proximas
+
+# GET /location/route 
+@app.get("/location/route", response_model=RouteResponse) # quando o usuário acessar a rota de rota com o método GET, ele vai executar a função get_route_to_unit
+def get_route_to_unit( # recebe a latitude e longitude de origem e destino e devolve a rota calculada
+    origem_lat: float,
+    origem_lon: float,
+    destino_lat: float,
+    destino_lon: float,
+    _: User = Depends(get_current_user),
+):
+    rota = calcular_rota(origem_lat, origem_lon, destino_lat, destino_lon) # chama a função calcular_rota para calcular a rota entre os pontos de origem e destino
+    if rota is None:
+        raise HTTPException(status_code=404, detail="Não foi possível calcular a rota até essa unidade")
+    return rota

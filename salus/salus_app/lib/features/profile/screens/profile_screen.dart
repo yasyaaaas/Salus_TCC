@@ -8,6 +8,7 @@ import '../widgets/edit_profile.dart';
 import '../widgets/avatar_picker.dart';
 import '../../../core/constants/avatars.dart';
 import '../widgets/chat_history_detail.dart';
+import '../widgets/exam_history_detail.dart';
 import '../../../shared/widgets/app_bottom_nav.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -22,6 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   List<dynamic> _historico = [];
+  List<dynamic> _historicoExames = [];
 
   @override
   void initState() {
@@ -34,15 +36,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _isLoading = true;
     });
 
+    // busca os 3 endpoints juntos para não causar delay
     final resultados = await Future.wait([
       ApiService().getProfile(),
       ApiService().getChatHistory(),
+      ApiService().getExamHistory(),
     ]);
 
     if (!mounted) return;
 
     final resultadoPerfil = resultados[0];
     final resultadoHistorico = resultados[1];
+    final resultadoExames = resultados[2];
 
     setState(() {
       _isLoading = false;
@@ -52,6 +57,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (resultadoHistorico.isSuccess) {
         _historico = (resultadoHistorico.data as List<dynamic>?) ?? [];
       }
+      if (resultadoExames.isSuccess) {
+      _historicoExames = (resultadoExames.data as List<dynamic>?) ?? [];
+    }
     });
   }
 
@@ -607,51 +615,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Histórico 
 
   // monta a seção de histórico de conversas do usuário
+  // mostra uma mensagem vazia quando ainda não há registros
+  // junta chats e exames em uma lista única e ordena pelo mais recente
   Widget _buildHistorySection() {
-    // mostra uma mensagem simples quando ainda não existe nenhum registro
-    if (_historico.isEmpty) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            AppStrings.profileHistory,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(20),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border, width: 0.5),
-            ),
-            child: const Text(
-              'Você ainda não conversou com o Salus',
-              style: TextStyle(fontSize: 13, color: AppColors.textHint),
-            ),
-          ),
-        ],
-      );
-    }
-
-    // transforma cada item do histórico que veio da API em um card visual com título e data
-    final items = _historico.map((registro) {
-      return _HistoryItem(
-        title: registro['mensagem_usuario'],
-        date: _formatarDataHistorico(DateTime.parse(registro['created_at'])),
-        color: AppColors.blue,
-        icon: Icons.chat_bubble_outline_rounded,
-        resposta: registro['resposta_chatbot'],
-        manchesterColor: registro['manchester_color'],
-        manchesterLabel: registro['manchester_label'],
-      );
-    }).toList();
-
+  // exibe um estado vazio quando não há histórico de chat nem de exames
+  if (_historico.isEmpty && _historicoExames.isEmpty) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -664,10 +632,98 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        ...items.map((item) => _buildHistoryCard(item)),
+        Container(
+          padding: const EdgeInsets.all(20),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border, width: 0.5),
+          ),
+          child: const Text(
+            'Você ainda não conversou com o Salus nem enviou exames',
+            style: TextStyle(fontSize: 13, color: AppColors.textHint),
+          ),
+        ),
       ],
     );
   }
+
+  // transforma cada conversa em um item clicável do histórico
+  final itensChat = _historico.map((registro) {
+    final data = DateTime.parse(registro['created_at']);
+    return _HistoryItem(
+      title: registro['mensagem_usuario'],
+      date: _formatarDataHistorico(data),
+      color: AppColors.blue,
+      icon: Icons.chat_bubble_outline_rounded,
+      sortDate: data,
+      onTap: () => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => ChatHistoryDetailSheet(
+          pergunta: registro['mensagem_usuario'],
+          resposta: registro['resposta_chatbot'],
+          data: _formatarDataHistorico(data),
+          manchesterColor: registro['manchester_color'],
+          manchesterLabel: registro['manchester_label'],
+        ),
+      ),
+    );
+  }).toList();
+
+  // transforma cada exame em um item com resumo de valores alterados
+  final itensExame = _historicoExames.map((registro) {
+    final data = DateTime.parse(registro['created_at']);
+    final resultadosLista = (registro['resultados'] as List<dynamic>? ?? []);
+    final alterados = resultadosLista
+        .where((r) => r['status'] == 'acima' || r['status'] == 'abaixo')
+        .length;
+    final subtitulo = alterados > 0
+        ? '$alterados valor${alterados > 1 ? "es" : ""} alterado${alterados > 1 ? "s" : ""}'
+        : 'Todos os valores normais';
+
+    return _HistoryItem(
+      title: (registro['nome_arquivo'] as String?) ?? 'Exame laboratorial',
+      date: '${_formatarDataHistorico(data)} · $subtitulo',
+      color: AppColors.mint,
+      icon: Icons.biotech_outlined,
+      sortDate: data,
+      onTap: () => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => ExamHistoryDetailSheet(
+          nomeArquivo: (registro['nome_arquivo'] as String?) ?? 'Exame laboratorial',
+          data: _formatarDataHistorico(data),
+          resultadosJson: resultadosLista,
+        ),
+      ),
+    );
+  }).toList();
+
+  // junta os dois tipos de item e organiza do mais novo para o mais antigo
+  final items = [...itensChat, ...itensExame]
+    ..sort((a, b) => b.sortDate.compareTo(a.sortDate));
+
+  // monta a lista final com os cards já prontos para a tela
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        AppStrings.profileHistory,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+        ),
+      ),
+      const SizedBox(height: 12),
+      ...items.map((item) => _buildHistoryCard(item)),
+    ],
+  );
+}
 
   // formata a data do registro para mostrar hoje, ontem ou uma data resumida
   String _formatarDataHistorico(DateTime data) {
@@ -723,22 +779,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: item.resposta == null
-              ? null // se por algum motivo não tiver resposta associada, o card fica sem reagir ao toque
-              : () {
-                  showModalBottomSheet( // abre a tela de detalhe da conversa ao tocar no card
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (context) => ChatHistoryDetailSheet(
-                      pergunta: item.title,
-                      resposta: item.resposta!,
-                      data: item.date,
-                      manchesterColor: item.manchesterColor,
-                      manchesterLabel: item.manchesterLabel,
-                    ),
-                  );
-                },
+          onTap: item.onTap,
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Row(
@@ -950,17 +991,16 @@ class _HistoryItem {
   final String date;
   final Color color;
   final IconData icon;
-  final String? resposta;
-  final String? manchesterColor;
-  final String? manchesterLabel;
+  final DateTime sortDate;
+  final VoidCallback? onTap;
+
   const _HistoryItem({
     required this.title,
     required this.date,
     required this.color,
     required this.icon,
-    this.resposta,
-    this.manchesterColor,
-    this.manchesterLabel,
+    required this.sortDate,
+    this.onTap,
   });
 }
 

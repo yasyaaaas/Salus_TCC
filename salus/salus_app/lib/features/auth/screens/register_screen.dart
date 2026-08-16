@@ -400,7 +400,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           GestureDetector(
-            onTap: () => Navigator.maybePop(context),
+            onTap: () => Navigator.pushReplacementNamed(context, '/onboarding'),
             child: Container(
               width: 36,
               height: 36,

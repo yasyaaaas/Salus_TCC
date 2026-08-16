@@ -1,10 +1,15 @@
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/services/api_service.dart';
 import '../../../shared/widgets/ethical_warning_bar.dart';
+import '../../../shared/widgets/app_bottom_nav.dart';
 import '../widgets/exam_result_table.dart';
 
+// tela de upload e análise de exames
 class ExamScreen extends StatefulWidget {
   const ExamScreen({super.key});
 
@@ -12,66 +17,65 @@ class ExamScreen extends StatefulWidget {
   State<ExamScreen> createState() => _ExamScreenState();
 }
 
+// controla o estado da tela de exames e os resultados recebidos
 class _ExamScreenState extends State<ExamScreen> {
   bool _hasResults = false;
   bool _isProcessing = false;
+  String? _errorMessage;
+  List<ExamResult> _results = [];
 
-  final List<ExamResult> _mockResults = const [
-    ExamResult(
-      parameter: 'Glicose',
-      value: '128',
-      unit: 'mg/dL',
-      reference: '70-99',
-      status: ExamStatus.high,
-    ),
-    ExamResult(
-      parameter: 'Hemoglobina',
-      value: '13,5',
-      unit: 'g/dL',
-      reference: '12-16',
-      status: ExamStatus.normal,
-    ),
-    ExamResult(
-      parameter: 'Colesterol total',
-      value: '215',
-      unit: 'mg/dL',
-      reference: '< 200',
-      status: ExamStatus.high,
-    ),
-    ExamResult(
-      parameter: 'Triglicerídeos',
-      value: '142',
-      unit: 'mg/dL',
-      reference: '< 150',
-      status: ExamStatus.normal,
-    ),
-    ExamResult(
-      parameter: 'Potássio',
-      value: '3,2',
-      unit: 'mEq/L',
-      reference: '3,5-5,0',
-      status: ExamStatus.low,
-    ),
-  ];
-
+  // lista apenas os resultados que precisam de atenção
   List<ExamResult> get _abnormal =>
-      _mockResults.where((r) => r.status != ExamStatus.normal).toList();
+      _results.where((r) => r.status != ExamStatus.normal).toList();
 
-  void _pickImage() {
-    setState(() => _isProcessing = true);
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
+  // escolhe um pdf e envia para análise na api
+  Future<void> _pickAndUploadPdf() async {
+    final resultadoArquivo = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+    );
+
+    if (resultadoArquivo == null || resultadoArquivo.files.single.path == null) {
+      return; // usuário cancelou a seleção
+    }
+
+    setState(() {
+      _isProcessing = true;
+      _errorMessage = null;
+    });
+
+    final arquivo = File(resultadoArquivo.files.single.path!);
+    final resultado = await ApiService().uploadExam(arquivo);
+
+    if (!mounted) return;
+
+    if (resultado.isSuccess) {
+      setState(() {
+        _results = resultado.data!
+            .map((item) => ExamResult.fromJson(item as Map<String, dynamic>))
+            .toList();
+        _isProcessing = false;
+        _hasResults = true;
+      });
+    } else {
       setState(() {
         _isProcessing = false;
-        _hasResults   = true;
+        _errorMessage = resultado.error;
       });
-    });
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(resultado.error ?? 'Erro ao analisar o exame')),
+        );
+      }
+    }
   }
 
+  // monta a estrutura principal da tela com cabeçalho e conteúdo
   @override
   Widget build(BuildContext context) {
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
     return Scaffold(
+      bottomNavigationBar: const AppBottomNav(currentIndex: 1),
       body: Column(
         children: [
           _buildHeader(context),
@@ -92,6 +96,7 @@ class _ExamScreenState extends State<ExamScreen> {
     );
   }
 
+  // cria o cabeçalho da tela com título e ação para iniciar outro exame
   Widget _buildHeader(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
@@ -107,20 +112,6 @@ class _ExamScreenState extends State<ExamScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
             children: [
-              GestureDetector(
-                onTap: () => Navigator.maybePop(context),
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.arrow_back_rounded,
-                      color: AppColors.white, size: 18),
-                ),
-              ),
-              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -146,7 +137,10 @@ class _ExamScreenState extends State<ExamScreen> {
               ),
               if (_hasResults)
                 GestureDetector(
-                  onTap: () => setState(() => _hasResults = false),
+                  onTap: () => setState(() {
+                    _hasResults = false;
+                    _results = [];
+                  }),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 6),
@@ -179,6 +173,7 @@ class _ExamScreenState extends State<ExamScreen> {
     );
   }
 
+  // mostra a tela de upload quando ainda não há resultado
   Widget _buildUploadView() {
     if (_isProcessing) {
       return Container(
@@ -226,7 +221,7 @@ class _ExamScreenState extends State<ExamScreen> {
             ),
             const SizedBox(height: 6),
             const Text(
-              'Extraindo valores com OCR',
+              'Extraindo e interpretando os valores do PDF',
               style: TextStyle(
                 fontSize: 13,
                 color: AppColors.textSecondary,
@@ -240,9 +235,34 @@ class _ExamScreenState extends State<ExamScreen> {
     return Column(
       key: const ValueKey('upload'),
       children: [
-        // Card principal -> câmera
+        if (_errorMessage != null) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: AppColors.urgencyMediumSurface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.urgencyMediumBorder, width: 0.8),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded,
+                    color: AppColors.urgencyMedium, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _errorMessage!,
+                    style: const TextStyle(fontSize: 12, color: AppColors.urgencyMedium),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        // Card principal -> seleção de PDF
         GestureDetector(
-          onTap: _pickImage,
+          onTap: _pickAndUploadPdf,
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.all(32),
@@ -271,12 +291,12 @@ class _ExamScreenState extends State<ExamScreen> {
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.camera_alt_rounded,
+                  child: const Icon(Icons.picture_as_pdf_rounded,
                       color: AppColors.white, size: 32),
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  AppStrings.examsUpload,
+                  'Selecionar PDF do laudo',
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
@@ -286,61 +306,13 @@ class _ExamScreenState extends State<ExamScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Aponte a câmera para o laudo laboratorial',
+                  'Escolha o arquivo PDF do seu exame laboratorial',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
                     height: 1.4,
                   ),
                   textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        // Ou separador
-        Row(
-          children: [
-            const Expanded(child: Divider(color: AppColors.border)),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: const Text(
-                'ou',
-                style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textHint,
-                    fontWeight: FontWeight.w500),
-              ),
-            ),
-            const Expanded(child: Divider(color: AppColors.border)),
-          ],
-        ),
-        const SizedBox(height: 12),
-        // Botão galeria
-        GestureDetector(
-          onTap: _pickImage,
-          child: Container(
-            width: double.infinity,
-            height: 52,
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border, width: 1),
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.photo_library_outlined,
-                    color: AppColors.textSecondary, size: 20),
-                SizedBox(width: 8),
-                Text(
-                  AppStrings.examsGallery,
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
                 ),
               ],
             ),
@@ -378,12 +350,12 @@ class _ExamScreenState extends State<ExamScreen> {
     );
   }
 
+  // mostra a tabela e os alertas quando o exame já foi processado
   Widget _buildResultsView() {
     return Column(
       key: const ValueKey('results'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header de resultados
         Row(
           children: [
             Container(
@@ -409,7 +381,6 @@ class _ExamScreenState extends State<ExamScreen> {
           ],
         ),
         const SizedBox(height: 14),
-        // Tabela
         Container(
           decoration: BoxDecoration(
             color: AppColors.white,
@@ -425,16 +396,42 @@ class _ExamScreenState extends State<ExamScreen> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
-            child: ExamResultTable(results: _mockResults),
+            child: ExamResultTable(results: _results),
           ),
         ),
-        // Alertas
         if (_abnormal.isNotEmpty) ...[
           const SizedBox(height: 16),
           ..._abnormal.map((r) => _buildAlertCard(r)),
         ],
         const SizedBox(height: 24),
-        // CTA para localização
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.urgencyMediumSurface.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.urgencyMediumBorder.withValues(alpha: 0.45), width: 0.8),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.medical_services_outlined,
+                  color: AppColors.urgencyMedium, size: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Este resultado não substitui a avaliação de um médico',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.urgencyMedium,
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
         GestureDetector(
           onTap: () => Navigator.pushNamed(context, '/location'),
           child: Container(
@@ -466,8 +463,6 @@ class _ExamScreenState extends State<ExamScreen> {
                   ),
                 ),
                 SizedBox(width: 4),
-                Icon(Icons.arrow_forward_rounded,
-                    color: AppColors.white, size: 16),
               ],
             ),
           ),
@@ -476,29 +471,32 @@ class _ExamScreenState extends State<ExamScreen> {
     );
   }
 
+  // cria o card de alerta para resultados fora da referência
   Widget _buildAlertCard(ExamResult r) {
-    final isHigh = r.status == ExamStatus.high;
+    final isIndefinido = r.status == ExamStatus.indefinido;
+    final corPrincipal = isIndefinido ? AppColors.textSecondary : AppColors.urgencyMedium;
+    final corSurface = isIndefinido ? AppColors.surface : AppColors.urgencyMediumSurface;
+    final icone = isIndefinido ? Icons.help_outline_rounded : Icons.warning_amber_rounded;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.urgencyMediumSurface,
+        color: corSurface,
         borderRadius: BorderRadius.circular(12),
-        border: const Border(
-          left: BorderSide(color: AppColors.urgencyMedium, width: 3),
-        ),
+        border: Border(left: BorderSide(color: corPrincipal, width: 3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded,
-              color: AppColors.urgencyMedium, size: 18),
+          Icon(icone, color: corPrincipal, size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              '${r.parameter} ${isHigh ? 'acima' : 'abaixo'} do valor de referência. Procure um médico.',
-              style: const TextStyle(
+              r.mensagem ??
+                  '${r.parameter} fora do valor de referência. Procure um médico.',
+              style: TextStyle(
                 fontSize: 13,
-                color: AppColors.urgencyMedium,
+                color: corPrincipal,
                 height: 1.4,
                 fontWeight: FontWeight.w500,
               ),

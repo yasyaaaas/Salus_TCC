@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 
-enum ExamStatus { normal, high, low }
+// representa o estado visual de um resultado de exame
+enum ExamStatus { normal, high, low, indefinido }
 
+// guarda os dados de um parâmetro do exame para exibir na tabela
 class ExamResult {
   final String parameter;
   final String value;
   final String unit;
   final String reference;
   final ExamStatus status;
+  final String? mensagem;
 
   const ExamResult({
     required this.parameter,
@@ -16,14 +19,61 @@ class ExamResult {
     required this.unit,
     required this.reference,
     required this.status,
+    this.mensagem,
   });
+
+  // cria um objeto a partir do json retornado pela api
+  factory ExamResult.fromJson(Map<String, dynamic> json) {
+    return ExamResult(
+      parameter: json['parametro'] as String,
+      value: _formatNumero(json['valor']),
+      unit: json['unidade'] as String,
+      reference: _formatReferencia(json['valor_min'], json['valor_max']),
+      status: _parseStatus(json['status'] as String),
+      mensagem: json['mensagem'] as String?,
+    );
+  }
+
+  // formata números para o padrão brasileiro com vírgula
+  static String _formatNumero(dynamic valor) {
+    final numero = (valor as num).toDouble();
+    // troca ponto por vírgula pro padrão brasileiro (ex: 217.6 -> 217,6)
+    final texto = numero % 1 == 0
+        ? numero.toStringAsFixed(0)
+        : numero.toString();
+    return texto.replaceAll('.', ',');
+  }
+
+  // monta a faixa de referência para exibir na tabela
+  static String _formatReferencia(dynamic min, dynamic max) {
+    if (min == null && max == null) return 'Não determinada';
+    if (min == null) return '< ${_formatNumero(max)}';
+    if (max == null) return '> ${_formatNumero(min)}';
+    return '${_formatNumero(min)} - ${_formatNumero(max)}';
+  }
+
+  // converte o status vindo da api em um enum interno
+  static ExamStatus _parseStatus(String status) {
+    switch (status) {
+      case 'acima':
+        return ExamStatus.high;
+      case 'abaixo':
+        return ExamStatus.low;
+      case 'indefinido':
+        return ExamStatus.indefinido;
+      default:
+        return ExamStatus.normal;
+    }
+  }
 }
 
+// widget que monta a tabela visual com os resultados do exame
 class ExamResultTable extends StatelessWidget {
   final List<ExamResult> results;
 
   const ExamResultTable({super.key, required this.results});
 
+  // monta o cabeçalho e as linhas da tabela
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -36,6 +86,7 @@ class ExamResultTable extends StatelessWidget {
     );
   }
 
+  // cria o cabeçalho da tabela com os nomes das colunas
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -101,8 +152,9 @@ class ExamResultTable extends StatelessWidget {
     );
   }
 
+  // cria uma linha da tabela com os dados de um parâmetro
   Widget _buildRow(ExamResult r, {required bool isLast}) {
-    final isAbnormal = r.status != ExamStatus.normal;
+    final isAbnormal = r.status == ExamStatus.high || r.status == ExamStatus.low;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       decoration: BoxDecoration(
@@ -185,6 +237,7 @@ class ExamResultTable extends StatelessWidget {
     );
   }
 
+  // mostra o badge visual de acordo com o status do resultado
   Widget _buildStatusBadge(ExamStatus status) {
     switch (status) {
       case ExamStatus.normal:
@@ -235,6 +288,23 @@ class ExamResultTable extends StatelessWidget {
               fontSize: 11,
               fontWeight: FontWeight.w700,
               color: AppColors.blueDark,
+            ),
+          ),
+        );
+      case ExamStatus.indefinido:
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.border, width: 0.8),
+          ),
+          child: const Text(
+            '? Consulte',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary,
             ),
           ),
         );

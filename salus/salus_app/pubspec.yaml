@@ -14,6 +14,10 @@ dependencies:
   http: ^1.2.0
   shared_preferences: ^2.2.0
   flutter_markdown: ^0.7.0
+  file_picker: ^8.1.2 # para pegar o arquivo pdf do exame
+  geolocator: ^13.0.1 # para pegar a localização do usuário
+  flutter_map: ^7.0.2 # para mostrar o mapa com a localização do usuário
+  latlong2: ^0.9.1 # para trabalhar com coordenadas de latitude e longitude
 
 dev_dependencies:
   flutter_test:
