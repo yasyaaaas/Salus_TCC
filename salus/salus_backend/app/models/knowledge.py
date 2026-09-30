@@ -22,7 +22,6 @@ class Condition(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     cid10: Mapped[str] = mapped_column(String(10), nullable=True)
-    informative_message: Mapped[str] = mapped_column(Text, nullable=False)
     manchester_color: Mapped[str] = mapped_column(String(20), nullable=False)
     manchester_label: Mapped[str] = mapped_column(String(80), nullable=False)
 

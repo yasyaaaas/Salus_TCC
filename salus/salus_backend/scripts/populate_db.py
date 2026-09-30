@@ -1,8 +1,8 @@
 import csv
-from app.db.database import SessionLocal
+from app.db.database import SessionLocal, engine, Base
 from app.models.knowledge import Symptom, Condition, SymptomCondition
 
-# garante que cada sintoma seja armazenado apenas uma vez na tabela
+
 def buscar_ou_criar_sintoma(db, nome: str) -> Symptom:
     nome = nome.strip().lower()
     sintoma = db.query(Symptom).filter(Symptom.name == nome).first()
@@ -10,45 +10,50 @@ def buscar_ou_criar_sintoma(db, nome: str) -> Symptom:
         return sintoma
     sintoma = Symptom(name=nome)
     db.add(sintoma)
-    db.flush()  # já gera o id sem precisar commitar ainda
+    db.flush()
     return sintoma
 
 
 def run():
-    db = SessionLocal() # cria uma novase ssão do db
+    # Cria as tabelas se ainda não existirem (usa o metadata dos modelos)
+    Base.metadata.create_all(bind=engine)
 
-    if db.query(Condition).count() > 0: # quantos registros existem na tabela de conditions
+    db = SessionLocal()
+
+    if db.query(Condition).count() > 0:
         print("Base já populada.")
         db.close()
         return
 
-    with open("data/conditions_seed.csv", encoding="utf-8") as f: # abre o .csv 
-        table = csv.DictReader(f, delimiter=";") # em mode leitura
-        contador = 0 # contador de doenças
-        for linha in table: # cada linha na tabela
+    with open("data/conditions_seed.csv", encoding="utf-8") as f:
+        table = csv.DictReader(f, delimiter=";")
+        contador = 0
+        for linha in table:
             condicao = Condition(
                 name=linha["name"].strip(),
                 cid10=linha["cid10"].strip(),
-                informative_message=linha["informative_message"].strip(),
                 manchester_color=linha["manchester_color"].strip(),
                 manchester_label=linha["manchester_label"].strip(),
             )
-            db.add(condicao) # adiciona a doença na no db
-            db.flush() # gera oi id da doença imediatamente
+            db.add(condicao)
+            db.flush()
 
-            for par in linha["symptoms"].split("|"): # quebra a linah de sintomas (ex: dor nas costas:0.43|calafrios:0.43|...
-                nome_sintoma, peso = par.split(":") # a cada par fazemos nome do sintoma e peso (ex: dor nas costas 0.43
-                sintoma = buscar_ou_criar_sintoma(db, nome_sintoma) # busca se o sintoma já foi cadastrado
+            for par in linha["symptoms"].split("|"):
+                par = par.strip()
+                if not par or ":" not in par:
+                    continue
+                nome_sintoma, peso = par.split(":", 1)
+                sintoma = buscar_ou_criar_sintoma(db, nome_sintoma)
                 db.add(SymptomCondition(
-                    symptom_id=sintoma.id, # id do sintoma atual
-                    condition_id=condicao.id, # id da doença atual
-                    weight=float(peso), # peso
+                    symptom_id=sintoma.id,
+                    condition_id=condicao.id,
+                    weight=float(peso),
                 ))
-            contador += 1 # incrementa o contador
+            contador += 1
 
-    db.commit() # 
+    db.commit()
     db.close()
-    print(f"{contador} condições carregadas com sucesso.") # printa se deu tudo certo
+    print(f"{contador} condições carregadas com sucesso.")
 
 
 if __name__ == "__main__":

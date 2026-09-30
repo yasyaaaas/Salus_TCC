@@ -26,9 +26,18 @@ salus_backend/
 │ │ └── location_service.py # Busca unidades de saúde e calcula rotas
 │ └── auth_deps.py # Dependência que exige token JWT nas rotas protegidas
 ├── data/
-│ └── conditions_seed.csv # Base de sintomas, condições e níveis de urgência
+│   ├── cid10/ # Tabelas oficiais do CID-10 (DATASUS)
+│   │   ├── CID-10-CATEGORIAS.CSV
+│   │   └── CID-10-SUBCATEGORIAS.CSV
+│   ├── cache_traducao.csv # Cache de traduções
+│   ├── clustered_dataset.csv # Dataset agrupado por clusters
+│   ├── conditions_seed.csv # Base de sintomas, condições, níveis de urgência e CID-10
+│   └── Disease_and_symptoms_dataset_original.csv # Dataset original bruto
 ├── scripts/
-│ └── populate_db.py # Popula o banco com os dados do CSV
+│   ├── agrupar_por_doenca.py # Agrupa condições por doença
+│   ├── gerar_salus_csv.py # Gera o CSV no formato Salus
+│   ├── populate_db.py # Popula o banco com os dados do CSV                         
+│   └── testar_gemini.py # Testes com a API do Gemini
 ├── main.py # Ponto de entrada da API (rotas e configuração)
 ├── docker-compose.yml # Configuração do PostgreSQL em contêiner
 ├── requirements.txt # Dependências do projeto

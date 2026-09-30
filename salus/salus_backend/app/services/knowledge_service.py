@@ -1,9 +1,30 @@
 # knowledge_service.py -> analiza o texto do usuario e identifa os sintomas qeu aparecem nele (o qeu o gemini vai usar)
 
+import re
+
 from sqlalchemy.orm import Session
+from unidecode import unidecode
 from app.models.knowledge import Symptom, Condition
 
-ORDEM_URGENCIA = {"vermelho": 0, "laranja": 1, "amarelo": 2, "verde": 3, "azul": 4}
+ORDEM_URGENCIA = {"Vermelho": 0, "Laranja": 1, "Amarelo": 2, "Verde": 3, "Azul": 4}
+
+# normaliza texto (minúsculas, sem acento, sem pontuação)
+def normalizar(t: str) -> str:
+    if not t:
+        return ""
+    t = t.lower()
+    t = unidecode(t) # "cabeça" -> "cabeca"
+    t = re.sub(r"[^\w\s]", " ", t) # vírgula/ponto -> espaço
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
+# normaliza o valor da cor para bater com o dicionário em minúsculo
+def ordem_cor(cor: str | None) -> int:
+    if not cor:
+        return 99
+    return ORDEM_URGENCIA.get(cor.strip().lower(), 99)
+
 
 # palavras qeu se podem pular
 STOPWORDS = {
@@ -18,13 +39,19 @@ INTENSIDADE = {
     "moderado", "severa", "severo", "aguda", "agudo", "crônica", "crônico",
 }
 
+
+# normaliza os conjuntos UMA vez, para comparar sem acento
+STOPWORDS = {normalizar(p) for p in STOPWORDS}
+INTENSIDADE = {normalizar(p) for p in INTENSIDADE}
+
 # remove stopwords e palavras de intensidade sobrando as palavras qeu identificam o sintoma
 def palavras_essenciais(nome_sintoma: str) -> list[str]:
+    nome_norm = normalizar(nome_sintoma)
     palavras = [
-        p for p in nome_sintoma.split()
+        p for p in nome_norm.split()
         if p not in STOPWORDS and p not in INTENSIDADE
     ]
-    return palavras or nome_sintoma.split()  # nunca devolve lista vazia
+    return palavras or nome_norm.split()  # nunca devolve lista vazia
 
 # Só bate se TODAS as palavras essenciais do sintoma estiverem no texto
 def sintoma_bate_no_texto(nome_sintoma: str, palavras_do_texto: set[str]) -> bool:
@@ -34,8 +61,7 @@ def sintoma_bate_no_texto(nome_sintoma: str, palavras_do_texto: set[str]) -> boo
 
 # retorna una lista de dincionário cada um com do dados da sua condição
 def buscar_condicoes_relacionadas(texto_usuario: str, db: Session, top_n: int = 3) -> list[dict]:  # top_n -> top 3 condições mais provaveis
-    texto_normalizado = texto_usuario.lower()
-    palavras_do_texto = set(texto_normalizado.split())  # quebra a frase em palavras únicas
+    palavras_do_texto = set(normalizar(texto_usuario).split())
 
     todos_sintomas = db.query(Symptom).all()
     sintomas_encontrados = [
@@ -71,7 +97,7 @@ def buscar_condicoes_relacionadas(texto_usuario: str, db: Session, top_n: int = 
         pontuacao_final,
         key=lambda c_id: (
             -pontuacao_final[c_id],
-            ORDEM_URGENCIA[condicao_por_id[c_id].manchester_color],
+            ordem_cor(condicao_por_id[c_id].manchester_color),
         ),
     )
 
@@ -83,7 +109,6 @@ def buscar_condicoes_relacionadas(texto_usuario: str, db: Session, top_n: int = 
             "cid10": condicao.cid10,
             "manchester_color": condicao.manchester_color,
             "manchester_label": condicao.manchester_label,
-            "informative_message": condicao.informative_message,
             "pontuacao": round(pontuacao_final[c_id], 2),
         })
 
