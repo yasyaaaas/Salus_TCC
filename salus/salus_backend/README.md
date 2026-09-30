@@ -32,7 +32,7 @@ salus_backend/
 │   ├── cache_traducao.csv # Cache de traduções
 │   ├── clustered_dataset.csv # Dataset agrupado por clusters
 │   ├── conditions_seed.csv # Base de sintomas, condições, níveis de urgência e CID-10
-│   └── Disease_and_symptoms_dataset_original.csv # Dataset original bruto
+│   └── Disease_and_symptoms_dataset_original.csv # Dataset original bruto (não commitado pois o arquivo era muito grande)
 ├── scripts/
 │   ├── agrupar_por_doenca.py # Agrupa condições por doença
 │   ├── gerar_salus_csv.py # Gera o CSV no formato Salus
