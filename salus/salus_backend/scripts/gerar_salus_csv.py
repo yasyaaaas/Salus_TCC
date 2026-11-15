@@ -113,7 +113,6 @@ for doenca in df.index:
         "cid10": "",
         "manchester_color": "",
         "manchester_label": "",
-        "informative_message": "",
         "symptoms": sintomas_str,
     })
 

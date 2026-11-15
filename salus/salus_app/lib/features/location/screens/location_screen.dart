@@ -107,6 +107,15 @@ class _LocationScreenState extends State<LocationScreen> {
       _errorMessage = null;
     });
 
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = "O GPS está desativado. Ative a localização no seu dispositivo.";
+      });
+      return;
+    }
+
     final posResult = await _api.getCurrentLocation(); // pega a posição atual do usuário usando
     if (!mounted) return;
 
@@ -138,12 +147,19 @@ class _LocationScreenState extends State<LocationScreen> {
     });
 
     if (result.isSuccess) {
-      final List<dynamic> data = result.data!; // converte o JSON retornado pela API em uma lista de objetos HealthUnit
-      final units = data.map((item) => HealthUnit.fromJson(item as Map<String, dynamic>)).toList();
-      setState(() {
-        _units = units;
-        _filteredUnits = _applyFilter(units, _selectedFilter); // aplica o filtro selecionado para mostrar apenas as unidades do tipo escolhido
-      });
+      try{
+        final List<dynamic> data = result.data!; // converte o JSON retornado pela API em uma lista de objetos HealthUnit
+        final units = data.map((item) => HealthUnit.fromJson(item as Map<String, dynamic>)).toList();
+        setState(() {
+          _units = units;
+          _filteredUnits = _applyFilter(units, _selectedFilter); // aplica o filtro selecionado para mostrar apenas as unidades do tipo escolhido
+        });
+      } catch (e) {
+        setState(() {
+          _errorMessage = 'Erro ao processar os dados das unidades.';
+          _isLoading = false;
+        });
+      }
     } else {
       setState(() {
         _errorMessage = result.error;
@@ -530,7 +546,9 @@ class _LocationScreenState extends State<LocationScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 6),
-                Row(
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
                   children: [
                     if (unit.isSus)
                       _buildBadge(
@@ -538,20 +556,17 @@ class _LocationScreenState extends State<LocationScreen> {
                         const Color(0xFFE3F2FD),
                         const Color(0xFF1565C0),
                       ),
-                    if (unit.isSus) const SizedBox(width: 6),
                     _buildBadge(
                       '${unit.distance.toStringAsFixed(1)} km',
                       const Color(0xFFF3E5F5),
                       const Color(0xFF7B1FA2),
                     ),
-                    if (unit.isOpen24h) ...[
-                      const SizedBox(width: 6),
+                    if (unit.isOpen24h)
                       _buildBadge(
                         '24h',
                         const Color(0xFFE8F5E9),
                         AppColors.mintDark,
                       ),
-                    ],
                   ],
                 ),
               ],

@@ -69,7 +69,6 @@ class CondicaoRelacionada(BaseModel): # o qeu vai voltar para o usuario
     cid10: str | None
     manchester_color: str
     manchester_label: str
-    informative_message: str
     pontuacao: float
 
 

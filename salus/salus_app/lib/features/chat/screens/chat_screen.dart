@@ -27,15 +27,15 @@ class _ChatScreenState extends State<ChatScreen>
   // converte a cor recebida em um nível de urgência
   UrgencyLevel? _urgencyFromColor(String? color) {
     switch (color) {
-      case 'vermelho':
+      case 'Vermelho':
         return UrgencyLevel.immediate;
-      case 'laranja':
+      case 'Laranja':
         return UrgencyLevel.veryUrgent;
-      case 'amarelo':
+      case 'Amarelo':
         return UrgencyLevel.urgent;
-      case 'verde':
+      case 'Verde':
         return UrgencyLevel.lessUrgent;
-      case 'azul':
+      case 'Azul':
         return UrgencyLevel.notUrgent;
       default:
         return null;
