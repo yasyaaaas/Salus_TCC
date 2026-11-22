@@ -33,6 +33,8 @@ Diante do crescente uso da inteligência artificial para esclarecer dúvidas sob
 
 **Diferencial:** mecanismos de moderação ética das respostas da IA, garantindo que nenhum fluxo da aplicação resulte em diagnóstico médico conclusivo.
 
+**Modelagem de Dados:** A estrutura do banco de dados PostgreSQL, incluindo o Diagrama de Entidade-Relacionamento (DER) e o script de criação das tabelas (`schema.sql`), está documentada na pasta `salus_backend/data/` e foi detalhada no texto do TCC (Seção 3.2).
+
 ---
 
 ## Funcionalidades

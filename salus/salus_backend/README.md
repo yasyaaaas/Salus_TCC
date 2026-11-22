@@ -32,7 +32,9 @@ salus_backend/
 │   ├── cache_traducao.csv # Cache de traduções
 │   ├── clustered_dataset.csv # Dataset agrupado por clusters
 │   ├── conditions_seed.csv # Base de sintomas, condições, níveis de urgência e CID-10
-│   └── Disease_and_symptoms_dataset_original.csv # Dataset original bruto (não commitado pois o arquivo era muito grande)
+│   ├── Disease_and_symptoms_dataset_original.csv # Dataset original bruto (não commitado pois o arquivo era muito grande)
+│   ├── Diagrama_de_Entidade_Relacionamento_DER.png # Diagrama visual do banco de dados
+│   └── schema.sql # Script SQL de criação das tabelas (PostgreSQL)
 ├── scripts/
 │   ├── agrupar_por_doenca.py # Agrupa condições por doença
 │   ├── gerar_salus_csv.py # Gera o CSV no formato Salus
@@ -72,6 +74,14 @@ python -m scripts.populate_db
 uvicorn main:app --reload
 A API estará disponível em http://localhost:8000. Documentação interativa em /docs.
 ```
+
+## Modelagem do Banco de Dados
+
+A persistência de dados do Salus é feita em PostgreSQL, com o mapeamento objeto-relacional (ORM) via SQLAlchemy. 
+
+Para fins de documentação e replicação do ambiente, a pasta `data/` contém:
+- `schema.sql`: Script SQL completo com a criação de todas as tabelas, tipos de dados, chaves primárias (PK), chaves estrangeiras (FK) e restrições de integridade.
+- `Diagrama_de_Entidade_Relacionamento_DER.png`: Representação visual do modelo de dados.
 
 ## Tecnologias
 - Python + FastAPI
